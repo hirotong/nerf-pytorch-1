@@ -150,7 +150,7 @@ def main():
     optimizer = getattr(torch.optim, cfg.optimizer.type)(trainable_parameters, lr=cfg.optimizer.lr)
 
     # Setup logging.
-    logdir = os.path.join(cfg.experiment.logdir, cfg.experiment.id + "_prob_sampling" if cfg.nerf.train.prob_sampling else '')
+    logdir = os.path.join(cfg.experiment.logdir, cfg.experiment.id + ("_prob_sampling" if cfg.nerf.train.prob_sampling else ''))
     os.makedirs(logdir, exist_ok=True)
     writer = SummaryWriter(logdir)
     # Write out config parameters.
