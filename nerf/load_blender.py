@@ -36,6 +36,24 @@ def pose_spherical(theta, phi, radius):
     c2w = np.array([[-1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]) @ c2w
     return c2w
 
+def prob_from_image_gradient(image, with_mask=True):
+    # grad
+    
+    if with_mask and image.shape[-1] == 4:
+        mask = image[..., -1]
+        mask = cv2.GaussianBlur(mask, ksize=(15,15), sigmaX=0).astype(np.float32) / 255.0
+    else:
+        mask = np.ones(image.shape[:2], dtype=np.float32)
+    
+    sobel_x = cv2.Sobel(image[..., :3], cv2.CV_32F, 1, 0, ksize=5)
+    sobel_y = cv2.Sobel(image[..., :3], cv2.CV_32F, 0, 1, ksize=5)
+    
+    gradient = np.sum(np.abs(sobel_x) + np.abs(sobel_y), axis=-1) * mask
+    gradient += 0.1*gradient.mean()
+    prob = gradient / gradient.sum()
+    
+    return prob
+
 
 def load_blender_data(basedir, half_res=False, testskip=1, debug=False):
     splits = ["train", "val", "test"]
@@ -46,11 +64,13 @@ def load_blender_data(basedir, half_res=False, testskip=1, debug=False):
 
     all_imgs = []
     all_poses = []
+    all_probs = []
     counts = [0]
     for s in splits:
         meta = metas[s]
         imgs = []
         poses = []
+        probs = []
         if s == "train" or testskip == 0:
             skip = 1
         else:
@@ -60,16 +80,21 @@ def load_blender_data(basedir, half_res=False, testskip=1, debug=False):
             fname = os.path.join(basedir, frame["file_path"] + ".png")
             imgs.append(imageio.imread(fname))
             poses.append(np.array(frame["transform_matrix"]))
+            probs.append(prob_from_image_gradient(imgs[-1]))
+            
         imgs = (np.array(imgs) / 255.0).astype(np.float32)
         poses = np.array(poses).astype(np.float32)
+        probs = np.array(probs).astype(np.float32)
         counts.append(counts[-1] + imgs.shape[0])
         all_imgs.append(imgs)
         all_poses.append(poses)
+        all_probs.append(probs)
 
     i_split = [np.arange(counts[i], counts[i + 1]) for i in range(3)]
 
     imgs = np.concatenate(all_imgs, 0)
     poses = np.concatenate(all_poses, 0)
+    probs = np.concatenate(all_probs, 0)
 
     H, W = imgs[0].shape[:2]
     camera_angle_x = float(meta["camera_angle_x"])
@@ -94,9 +119,18 @@ def load_blender_data(basedir, half_res=False, testskip=1, debug=False):
             )
             for i in range(imgs.shape[0])
         ]
+        
+        probs = [
+            torch.from_numpy(
+                cv2.resize(probs[i], dsize=(25,25), interpolation=cv2.INTER_LINEAR)
+            )
+            for i in range(probs.shape[0])
+        ]
+        
         imgs = torch.stack(imgs, 0)
         poses = torch.from_numpy(poses)
-        return imgs, poses, render_poses, [H, W, focal], i_split
+        probs = torch.stack(probs, 0)
+        return imgs, poses, render_poses, [H, W, focal], i_split, probs
 
     if half_res:
         # TODO: resize images using INTER_AREA (cv2)
@@ -109,8 +143,15 @@ def load_blender_data(basedir, half_res=False, testskip=1, debug=False):
             )
             for i in range(imgs.shape[0])
         ]
+        probs = [
+            torch.from_numpy(
+                cv2.resize(probs[i], dsize=(400, 400), interpolation=cv2.INTER_LINEAR)
+            )
+            for i in range(probs.shape[0])
+        ]
         imgs = torch.stack(imgs, 0)
+        probs = torch.stack(probs, 0)
 
     poses = torch.from_numpy(poses)
 
-    return imgs, poses, render_poses, [H, W, focal], i_split
+    return imgs, poses, render_poses, [H, W, focal], i_split, probs

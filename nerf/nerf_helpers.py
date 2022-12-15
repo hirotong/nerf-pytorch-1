@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 
@@ -27,7 +27,7 @@ def get_minibatches(inputs: torch.Tensor, chunksize: Optional[int] = 1024 * 8):
 
 def meshgrid_xy(
     tensor1: torch.Tensor, tensor2: torch.Tensor
-) -> (torch.Tensor, torch.Tensor):
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """Mimick np.meshgrid(..., indexing="xy") in pytorch. torch.meshgrid only allows "ij" indexing.
     (If you're unsure what this means, safely skip trying to understand this, and run a tiny example!)
 
@@ -238,7 +238,7 @@ def sample_pdf(bins, weights, num_samples, det=False):
         u = torch.rand(list(cdf.shape[:-1]) + [num_samples]).to(weights)
 
     # Invert CDF
-    inds = torchsearchsorted.searchsorted(
+    inds = torch.searchsorted(
         cdf.contiguous(), u.contiguous(), side="right"
     )
     below = torch.max(torch.zeros_like(inds), inds - 1)

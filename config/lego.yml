@@ -9,7 +9,7 @@ experiment:
   # Number of training iterations.
   train_iters: 200000
   # Number of training iterations after which to validate.
-  validate_every: 100
+  validate_every: 1000
   # Number of training iterations after which to checkpoint.
   save_every: 5000
   # Number of training iterations after which to print progress.
@@ -20,7 +20,7 @@ dataset:
   # Type of dataset (Blender vs LLFF vs DeepVoxels vs something else)
   type: blender
   # Base directory of dataset.
-  basedir: cache/nerf_synthetic/lego
+  basedir: ~/dataset/NeRF_Data/nerf_synthetic/lego
   # Optionally, provide a path to the pre-cached dataset dir. This
   # overrides the other dataset options.
   cachedir: cache/legocache200
@@ -116,6 +116,10 @@ scheduler:
   # Rate at which to apply this decay.
   lr_decay_factor: 0.1
 
+# loss function
+loss:
+  type: MSE
+
 # NeRF parameters.
 nerf:
   # Use viewing directions as input, in addition to the X, Y, Z coordinates.
@@ -128,7 +132,7 @@ nerf:
   train:
     # Number of random rays to retain from each image.
     # These sampled rays are used for training, and the others are discarded.
-    num_random_rays: 1024  # 32 * 32 * 4
+    num_random_rays: 1024 # 1024  # 32 * 32 * 4
     # Size of each chunk (rays are batched into "chunks" and passed through
     # the network)
     chunksize: 131072  # 131072  # 1024 * 32
@@ -145,11 +149,13 @@ nerf:
     radiance_field_noise_std: 0.2
     # Sample linearly in disparity space, as opposed to in depth space.
     lindisp: False
+    # use probability map for ray sampling 
+    prob_sampling: False
   # Validation-specific parameters.
   validation:
     # Number of random rays to retain from each image.
     # These sampled rays are used for training, and the others are discarded.
-    chunksize: 131072   # 1024 * 32
+    chunksize: 32768   # 1024 * 32
     # Whether or not to perturb the sampled depth values.
     perturb: False
     # Number of depth samples per ray for the coarse network.

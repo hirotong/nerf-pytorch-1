@@ -1,5 +1,5 @@
 import os
-
+import cv2
 import imageio
 import numpy as np
 
@@ -8,6 +8,28 @@ import numpy as np
 # Slightly modified version of LLFF data loading code
 #  see https://github.com/Fyusion/LLFF for original
 
+def prob_from_image_gradient(image, with_mask=True):
+    # grad
+    
+    if with_mask and image.shape[-1] == 4:
+        mask = image[..., -1]
+        mask = cv2.GaussianBlur(mask, ksize=(15,15), sigmaX=0).astype(np.float32) / 255.0
+    else:
+        mask = np.ones((image.shape[0], image.shape[1]), dtype=float)
+    
+    sobel_x = cv2.Sobel(image[..., :3], cv2.CV_64F, 1, 0, ksize=15)
+    sobel_y = cv2.Sobel(image[..., :3], cv2.CV_64F, 0, 1, ksize=15)
+    
+    gradient = np.sum(np.abs(sobel_x) + np.abs(sobel_y), axis=-1) * mask
+    gradient += 0.1*gradient.mean()
+    prob = gradient / gradient.sum()
+    
+    if True:
+        import matplotlib.pyplot as plt
+        plt.imshow(prob, cmap='jet')
+        plt.show()
+    
+    return prob
 
 def _minify(basedir, factors=[], resolutions=[]):
     needtoload = False
@@ -129,11 +151,13 @@ def _load_data(basedir, factor=None, width=None, height=None, load_imgs=True):
         else:
             return imageio.imread(f)
 
-    imgs = imgs = [imread(f)[..., :3] / 255.0 for f in imgfiles]
+    imgs = [imread(f)[..., :3] / 255.0 for f in imgfiles]
+    probs = [prob_from_image_gradient(img, False) for img in imgs]
     imgs = np.stack(imgs, -1)
+    probs = np.stack(probs, -1)
 
     print("Loaded image data", imgs.shape, poses[:, -1, 0])
-    return poses, bds, imgs
+    return poses, bds, imgs, probs
 
 
 def normalize(x):
@@ -279,7 +303,7 @@ def load_llff_data(
     basedir, factor=8, recenter=True, bd_factor=0.75, spherify=False, path_zflat=False
 ):
 
-    poses, bds, imgs = _load_data(
+    poses, bds, imgs, probs = _load_data(
         basedir, factor=factor
     )  # factor=8 downsamples original imgs by 8x
     print("Loaded", basedir, bds.min(), bds.max())
@@ -289,6 +313,7 @@ def load_llff_data(
     poses = np.moveaxis(poses, -1, 0).astype(np.float32)
     imgs = np.moveaxis(imgs, -1, 0).astype(np.float32)
     images = imgs
+    probs = np.moveaxis(probs, -1, 0).astype(np.float32)
     bds = np.moveaxis(bds, -1, 0).astype(np.float32)
 
     # Rescale if bd_factor is provided
@@ -351,4 +376,4 @@ def load_llff_data(
     images = images.astype(np.float32)
     poses = poses.astype(np.float32)
 
-    return images, poses, bds, render_poses, i_test
+    return images, poses, bds, render_poses, i_test, probs

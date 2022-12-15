@@ -109,9 +109,9 @@ def cache_nerf_dataset(args):
                 "target": target_s.detach().cpu(),
             }
 
-            save_path = os.path.join(
-                args.savedir, "train", str(img_idx).zfill(4) + ".data"
-            )
+            # save_path = os.path.join(
+            #     args.savedir, "train", str(img_idx).zfill(4) + ".data"
+            # )
             torch.save(cache_dict, save_path)
 
             if args.sample_all is True:
