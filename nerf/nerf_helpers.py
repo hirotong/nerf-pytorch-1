@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 import numpy as np
 import torch
 
-import torchsearchsorted
+# import torchsearchsorted
 
 def to8b(x):
     return (255 * np.clip(x, 0, 1)).astype(np.uint8)
@@ -241,7 +241,7 @@ def sample_pdf(bins, weights, num_samples, det=False):
 
     # Invert CDF
     inds = torch.searchsorted(
-        cdf.contiguous(), u.contiguous(), side="right"
+        cdf.contiguous(), u.contiguous(), right=True
     )
     below = torch.max(torch.zeros_like(inds), inds - 1)
     above = torch.min((cdf.shape[-1] - 1) * torch.ones_like(inds), inds)
@@ -287,7 +287,8 @@ def sample_pdf_2(bins, weights, num_samples, det=False):
     # Invert CDF
     u = u.contiguous()
     cdf = cdf.contiguous()
-    inds = torchsearchsorted.searchsorted(cdf, u, side="right")
+    inds = torch.searchsorted(cdf, u, right=True)
+    # inds = torchsearchsorted.searchsorted(cdf, u, side="right")
     below = torch.max(torch.zeros_like(inds - 1), inds - 1)
     above = torch.min((cdf.shape[-1] - 1) * torch.ones_like(inds), inds)
     inds_g = torch.stack((below, above), dim=-1)  # (batchsize, num_samples, 2)

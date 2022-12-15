@@ -376,7 +376,7 @@ def main():
                 )
         
         # Test
-        if i % cfg.experiment.test_every == 0 or i == cfg.experiment.train_iters - 1:
+        if (i % cfg.experiment.test_every == 0 and i > 0) or i == cfg.experiment.train_iters - 1:
             tqdm.write("[TEST] =======> Iter: " + str(i))
             if cfg.experiment.save_image:
                 savedir = os.path.join(logdir, f"test_{i:0>6d}")

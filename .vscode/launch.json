@@ -11,7 +11,7 @@
             "program": "train_nerf.py",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "args": ["--config", "config/blender_lowres.yml", "--prob_sampling", "--case", "ficus"],
+            "args": ["--config", "config/blender_lowres.yml","--case", "ficus"],
             "env": {"CUDA_VISIBLE_DEVICES": "0"}
         },
         {
