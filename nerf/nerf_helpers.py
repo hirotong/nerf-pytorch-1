@@ -1,10 +1,12 @@
 import math
 from typing import Optional, Tuple
-
+import numpy as np
 import torch
 
 import torchsearchsorted
 
+def to8b(x):
+    return (255 * np.clip(x, 0, 1)).astype(np.uint8)
 
 def img2mse(img_src, img_tgt):
     return torch.nn.functional.mse_loss(img_src, img_tgt)

@@ -10,10 +10,14 @@ experiment:
   train_iters: 200000
   # Number of training iterations after which to validate.
   validate_every: 1000
+  # Number of training iterations after which to test
+  test_every: 10000
   # Number of training iterations after which to checkpoint.
   save_every: 5000
   # Number of training iterations after which to print progress.
   print_every: 100
+  # whether to save images
+  save_image: True
 
 # Dataset parameters.
 dataset:

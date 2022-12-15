@@ -24,7 +24,7 @@ def prob_from_image_gradient(image, with_mask=True):
     gradient += 0.1*gradient.mean()
     prob = gradient / gradient.sum()
     
-    if True:
+    if False:
         import matplotlib.pyplot as plt
         plt.imshow(prob, cmap='jet')
         plt.show()

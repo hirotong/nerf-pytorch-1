@@ -2,6 +2,7 @@ import argparse
 import glob
 import os
 import time
+import imageio
 
 import numpy as np
 import cv2
@@ -169,7 +170,6 @@ def main():
         start_iter = checkpoint["iter"]
 
     # # TODO: Prepare raybatch tensor if batching random rays
-
     for i in trange(start_iter, cfg.experiment.train_iters):
 
         model_coarse.train()
@@ -374,6 +374,96 @@ def main():
                     + " Time: "
                     + str(time.time() - start)
                 )
+        
+        # Test
+        if i % cfg.experiment.test_every == 0 or i == cfg.experiment.train_iters - 1:
+            tqdm.write("[TEST] =======> Iter: " + str(i))
+            if cfg.experiment.save_image:
+                savedir = os.path.join(logdir, f"test_{i:0>6d}")
+                os.makedirs(savedir, exist_ok=True)
+            model_coarse.eval()
+            if model_fine:
+                model_coarse.eval()
+
+            start = time.time()
+            with torch.no_grad():
+                rgb_coarse, rgb_fine = None, None
+                target_ray_values = None
+                # TODO fulfill this part
+                if USE_CACHED_DATASET:
+                    datafile = np.random.choice(validation_paths)
+                    cache_dict = torch.load(datafile)
+                    rgb_coarse, _, acc_coarse, rgb_fine, _, acc_fine = run_one_iter_of_nerf(
+                        cache_dict["height"],
+                        cache_dict["width"],
+                        cache_dict["focal_length"],
+                        model_coarse,
+                        model_fine,
+                        cache_dict["ray_origins"].to(device),
+                        cache_dict["ray_directions"].to(device),
+                        cfg,
+                        mode="validation",
+                        encode_position_fn=encode_position_fn,
+                        encode_direction_fn=encode_direction_fn,
+                    )
+                    target_ray_values = cache_dict["target"].to(device)
+                else:
+                    psnr = []
+                    for idx, img_idx in enumerate(i_test):
+                        img_target = images[img_idx].to(device)
+                        pose_target = poses[img_idx, :3, :4].to(device)
+                        ray_origins, ray_directions = get_ray_bundle(H, W, focal, pose_target)
+                        rgb_coarse, disp_coarse, acc_coarse, rgb_fine, disp_fine, acc_fine = run_one_iter_of_nerf(
+                            H,
+                            W,
+                            focal,
+                            model_coarse,
+                            model_fine,
+                            ray_origins,
+                            ray_directions,
+                            cfg,
+                            mode="validation",
+                            encode_position_fn=encode_position_fn,
+                            encode_direction_fn=encode_direction_fn,
+                        )
+                        target_ray_values = img_target
+                        coarse_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
+                        loss, fine_loss = 0.0, 0.0
+                        if rgb_fine is not None:
+                            fine_loss = img2mse(rgb_fine[..., :3], target_ray_values[..., :3])
+                            loss = fine_loss
+                        else:
+                            loss = coarse_loss
+                        # loss = coarse_loss + fine_loss
+                        psnr.append(mse2psnr(loss.item()))
+                        
+                        # save test images
+                        if cfg.experiment.save_image:
+                            savefile = os.path.join(savedir, f"rgb_{idx:04d}.png")
+                            imageio.imwrite(savefile, np.moveaxis(cast_to_image(rgb_fine[..., :3]), 0, -1))
+                            savefile = os.path.join(savedir, f"disp_{idx:04d}.png")
+                            imageio.imwrite(savefile, (255 * np.array(T.ToPILImage()(visualize_depth(disp_fine)))).astype(np.uint8))
+                            savefile = os.path.join(savedir, f"gt_{idx:04d}.png")
+                            imageio.imwrite(savefile, np.moveaxis(cast_to_image(target_ray_values[..., :3]), 0, -1))
+                        
+                        
+                        
+                    psnr = np.array(psnr).mean()
+                    writer.add_scalar("validation/loss", loss.item(), i)
+                    writer.add_scalar("test/coarse_loss", coarse_loss.item(), i)
+                    writer.add_scalar("test/psnr", psnr, i)
+
+                    if rgb_fine is not None:
+                        writer.add_scalar("test/fine_loss", fine_loss.item(), i)
+                    tqdm.write(
+                        "test loss: "
+                        + str(loss.item())
+                        + " Test PSNR: "
+                        + str(psnr)
+                        + " Time: "
+                        + str(time.time() - start)
+                    )
+        
 
         if i % cfg.experiment.save_every == 0 or i == cfg.experiment.train_iters - 1:
             checkpoint_dict = {
